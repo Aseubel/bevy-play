@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bevy Web Arcade - 3D Games in Rust & WebAssembly</title>
+    <meta name="description" content="Play a collection of lightweight 3D games built with Bevy and Rust compiled to WebAssembly. Explore a 3D Voxel Sandbox or play 3D Snake directly in your browser.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #080a0f;
+            --card-bg: rgba(15, 18, 28, 0.75);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary-glow: #38bdf8;
+            --primary-glow-rgb: 56, 189, 248;
+            --secondary-glow: #a855f7;
+            --secondary-glow-rgb: 168, 85, 247;
+            --text-color: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-color);
+        }
+
+        /* Ambient background glow */
+        .ambient-glow {
+            position: absolute;
+            top: -10%;
+            left: -10%;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(var(--primary-glow-rgb), 0.12) 0%, rgba(var(--secondary-glow-rgb), 0.05) 50%, rgba(0,0,0,0) 80%);
+            z-index: 1;
+            pointer-events: none;
+            filter: blur(80px);
+        }
+
+        /* Game Arcade Portal */
+        #arcade-portal {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            z-index: 20;
+            overflow-y: auto;
+            background: radial-gradient(circle at center, rgba(13, 17, 28, 0.9) 0%, #080a0f 100%);
+        }
+
+        .portal-header {
+            text-align: center;
+            margin-bottom: 48px;
+            max-width: 600px;
+        }
+
+        .portal-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 42px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff 30%, var(--primary-glow) 70%, var(--secondary-glow) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .portal-desc {
+            font-size: 16px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 340px);
+            gap: 32px;
+            justify-content: center;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .game-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4),
+                        inset 0 1px 1px rgba(255, 255, 255, 0.05);
+        }
+
+        .game-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at top right, rgba(var(--glow-color-rgb), 0.15) 0%, rgba(0,0,0,0) 60%);
+            opacity: 0.6;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .game-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(var(--glow-color-rgb), 0.35);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6),
+                        0 0 24px rgba(var(--glow-color-rgb), 0.15),
+                        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+        }
+
+        .voxel-card {
+            --glow-color-rgb: var(--primary-glow-rgb);
+        }
+
+        .snake-card {
+            --glow-color-rgb: var(--secondary-glow-rgb);
+        }
+
+        .card-icon {
+            font-size: 40px;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+
+        .card-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 28px;
+            flex-grow: 1;
+        }
+
+        .btn-launch {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.2s;
+            display: block;
+            position: relative;
+            z-index: 2;
+        }
+
+        .game-card:hover .btn-launch {
+            background: linear-gradient(135deg, rgba(var(--glow-color-rgb), 0.9) 0%, rgba(var(--glow-color-rgb), 0.6) 100%);
+            color: #000;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(var(--glow-color-rgb), 0.35);
+        }
+
+        /* Top Bar for Back Navigation */
+        #top-navigation {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            z-index: 15;
+            display: none; /* Shown inside active game */
+        }
+
+        .btn-back {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-color);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 10px 20px;
+            border-radius: 12px;
+            text-decoration: none;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .btn-back:hover {
+            border-color: var(--primary-glow);
+            color: var(--primary-glow);
+            transform: translateX(-4px);
+        }
+
+        /* Game UI Panel */
+        #ui-panel {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            width: 320px;
+            padding: 24px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 
+                        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+            z-index: 10;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0.95;
+            display: none; /* Shown inside active game */
+        }
+
+        #ui-panel:hover {
+            border-color: rgba(var(--primary-glow-rgb), 0.3);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 
+                        0 0 20px rgba(var(--primary-glow-rgb), 0.1),
+                        inset 0 1px 1px rgba(255, 255, 255, 0.15);
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff 0%, #a5f3fc 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        h1 span.badge {
+            font-size: 10px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            background: rgba(var(--primary-glow-rgb), 0.15);
+            color: var(--primary-glow);
+            padding: 2px 8px;
+            border-radius: 99px;
+            border: 1px solid rgba(var(--primary-glow-rgb), 0.25);
+            display: inline-block;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+        }
+
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--primary-glow);
+            margin-bottom: 12px;
+        }
+
+        .control-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .control-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .control-key {
+            font-family: monospace;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #fff;
+            box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+        }
+
+        .control-desc {
+            color: var(--text-muted);
+        }
+
+        /* Loading Screen overlay */
+        #loader {
+            position: absolute;
+            inset: 0;
+            background: var(--bg-color);
+            display: none; /* Toggled via JS search param */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .loader-content {
+            text-align: center;
+            max-width: 400px;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(var(--primary-glow-rgb), 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary-glow);
+            animation: spin 1s linear infinite;
+            margin: 0 auto 24px;
+            box-shadow: 0 0 15px rgba(var(--primary-glow-rgb), 0.2);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loader-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff 0%, var(--primary-glow) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .loader-status {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, var(--primary-glow) 0%, #0284c7 100%);
+            color: #000;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(var(--primary-glow-rgb), 0.3);
+            display: none; /* Shown after load finishes */
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(var(--primary-glow-rgb), 0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn-start:active {
+            transform: translateY(0);
+        }
+
+        .panel-toggle {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+        }
+
+        .panel-toggle:hover {
+            border-color: var(--primary-glow);
+            color: var(--primary-glow);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 16px;
+            transition: color 0.2s;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+        }
+
+        /* Game Canvas Container */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: none; /* Shown inside active game */
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow"></div>
+
+    <!-- 1. Arcade Portal (Game List Grid) -->
+    <div id="arcade-portal">
+        <header class="portal-header">
+            <h1 class="portal-title">Bevy Web Arcade</h1>
+            <p class="portal-desc">Step into high-performance games built with Rust and Bevy, running entirely client-side using WebAssembly.</p>
+        </header>
+
+        <main class="grid-container">
+            <!-- Game Card 1: Voxel Sandbox -->
+            <article class="game-card voxel-card">
+                <div>
+                    <div class="card-icon">🌍</div>
+                    <h2 class="card-title">Voxel Sandbox</h2>
+                    <p class="card-desc">A 3D Minecraft-like world. Explore procedural terrains, generate trees, mine blocks, and place new structures.</p>
+                </div>
+                <a class="btn-launch" href="?game=voxel">Launch Game</a>
+            </article>
+
+            <!-- Game Card 2: 3D Retro Snake -->
+            <article class="game-card snake-card">
+                <div>
+                    <div class="card-icon">🐍</div>
+                    <h2 class="card-title">3D Retro Snake</h2>
+                    <p class="card-desc">The classic Snake game transformed into a 3D grid layout. Guide the snake, consume glowing energy cores, and beat your high score.</p>
+                </div>
+                <a class="btn-launch" href="?game=snake">Launch Game</a>
+            </article>
+        </main>
+    </div>
+
+    <!-- 2. Loading Overlay -->
+    <div id="loader" role="status" aria-live="polite">
+        <div class="loader-content">
+            <div class="spinner" id="spinner"></div>
+            <h2 class="loader-title" id="loader-title-text">Loading Game...</h2>
+            <p class="loader-status" id="load-status">Initializing engine components...</p>
+            <button class="btn-start" id="btn-play" onclick="startGame()">Enter Sandbox</button>
+        </div>
+    </div>
+
+    <!-- 3. Top Navigation (Arcade Home Link) -->
+    <nav id="top-navigation">
+        <a href="index.html" class="btn-back">
+            <span>←</span> Back to Arcade
+        </a>
+    </nav>
+
+    <!-- 4. Collapsed Info Toggle -->
+    <button class="panel-toggle" id="panel-open-btn" onclick="togglePanel(true)" aria-label="Open controls panel">
+        ℹ️
+    </button>
+
+    <!-- 5. Interactive Side Panel -->
+    <section id="ui-panel" aria-label="Game Info and Controls">
+        <button class="close-btn" onclick="togglePanel(false)" aria-label="Hide panel">✕</button>
+        
+        <!-- Game Title Heading (Changed dynamically) -->
+        <h1 id="panel-title-text">Game <span class="badge">Bevy 0.19</span></h1>
+        <p class="subtitle" id="panel-subtitle-text"></p>
+        
+        <!-- Controls Content (Rendered dynamically depending on the game) -->
+        <div id="panel-controls-container"></div>
+    </section>
+
+    <!-- 6. Game Canvas Container -->
+    <main id="game-container">
+        <!-- Bevy Canvas will be inserted here -->
+    </main>
+
+    <!-- WASM loading and initialization script -->
+    <script type="module">
+        import init from './bevy-play.js';
+
+        // Check which game was requested
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameParam = urlParams.get('game');
+
+        if (gameParam === 'voxel' || gameParam === 'snake') {
+            // Hide the arcade portal and show game elements
+            document.getElementById('arcade-portal').style.display = 'none';
+            document.getElementById('game-container').style.display = 'flex';
+            document.getElementById('top-navigation').style.display = 'block';
+            document.getElementById('loader').style.display = 'flex';
+
+            const loaderTitle = document.getElementById('loader-title-text');
+            const panelTitle = document.getElementById('panel-title-text');
+            const panelSubtitle = document.getElementById('panel-subtitle-text');
+            const controlsContainer = document.getElementById('panel-controls-container');
+            const playBtn = document.getElementById('btn-play');
+
+            if (gameParam === 'voxel') {
+                loaderTitle.innerText = "Voxel Sandbox";
+                panelTitle.innerHTML = 'Voxel Sandbox <span class="badge">Bevy 0.19</span>';
+                panelSubtitle.innerText = 'A high-performance Minecraft-inspired voxel demo running in your browser.';
+                playBtn.innerText = "Enter Sandbox";
+
+                controlsContainer.innerHTML = `
+                    <div class="section-title">Keyboard Controls</div>
+                    <ul class="control-list">
+                        <li class="control-item"><span class="control-desc">Movement</span><span class="control-key">W A S D</span></li>
+                        <li class="control-item"><span class="control-desc">Jump</span><span class="control-key">Spacebar</span></li>
+                        <li class="control-item"><span class="control-desc">Unlock Mouse</span><span class="control-key">Escape</span></li>
+                    </ul>
+                    <div class="section-title">Mouse Interactions</div>
+                    <ul class="control-list">
+                        <li class="control-item"><span class="control-desc">Look around</span><span class="control-key">Move Mouse</span></li>
+                        <li class="control-item"><span class="control-desc">Lock cursor / Break</span><span class="control-key">Left Click</span></li>
+                        <li class="control-item"><span class="control-desc">Place block</span><span class="control-key">Right Click</span></li>
+                    </ul>
+                    <div class="section-title">Block Types</div>
+                    <ul class="control-list">
+                        <li class="control-item"><span class="control-desc">Grass / Dirt / Stone</span><span class="control-key">1 / 2 / 3</span></li>
+                        <li class="control-item"><span class="control-desc">Wood / Leaves</span><span class="control-key">4 / 5</span></li>
+                    </ul>
+                `;
+            } else if (gameParam === 'snake') {
+                loaderTitle.innerText = "3D Retro Snake";
+                panelTitle.innerHTML = '3D Retro & Platformer Snake <span class="badge">Bevy 0.19</span>';
+                panelSubtitle.innerText = 'Retro arcade Snake in a 3D dual-layer arena. Navigate vertical floors and manage updrafts!';
+                playBtn.innerText = "Start Game";
+
+                controlsContainer.innerHTML = `
+                    <div class="section-title">Keyboard Controls</div>
+                    <ul class="control-list">
+                        <li class="control-item"><span class="control-desc">Movement</span><span class="control-key">W A S D / Arrow Keys</span></li>
+                        <li class="control-item"><span class="control-desc">Pause & Orbit View</span><span class="control-key">Spacebar</span></li>
+                        <li class="control-item"><span class="control-desc">Restart on Death</span><span class="control-key">R</span></li>
+                    </ul>
+                    <div class="section-title">Pause Mode Camera</div>
+                    <ul class="control-list">
+                        <li class="control-item"><span class="control-desc">Rotate camera view</span><span class="control-key">Move Mouse</span></li>
+                    </ul>
+                    <div class="section-title">Camera Settings</div>
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); cursor: pointer; margin-bottom: 20px;">
+                        <input type="checkbox" id="camera-reset-checkbox" checked style="accent-color: var(--primary-glow); cursor: pointer;">
+                        Auto-reset Camera view on resume
+                    </label>
+                    <div class="section-title">3D Layer Mechanics</div>
+                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                        The arena features an <strong>Upper Glass Floor</strong> and a <strong>Lower Metal Floor</strong>. The upper floor has open sides (East/West)—falling off drops you safely to the lower floor. Stepping on green <strong>Glowing Updraft Vents</strong> on the lower floor launches the snake back to the upper floor!
+                    </p>
+                `;
+            }
+
+            const statusEl = document.getElementById('load-status');
+            const spinnerEl = document.getElementById('spinner');
+
+            // Initialize WASM
+            init().then(() => {
+                statusEl.innerText = "Game assets compiled. Ready to play!";
+                spinnerEl.style.display = "none";
+                playBtn.style.display = "inline-block";
+                
+                // Show side panel by default on load
+                document.getElementById('ui-panel').style.display = 'block';
+            }).catch((err) => {
+                statusEl.innerText = "Error loading sandbox: " + err.message;
+                console.error("WASM Load Error: ", err);
+            });
+        }
+    </script>
+
+    <script>
+        function startGame() {
+            const loader = document.getElementById('loader');
+            loader.style.opacity = 0;
+            setTimeout(() => {
+                loader.style.display = 'none';
+            }, 500);
+        }
+
+        function togglePanel(visible) {
+            const panel = document.getElementById('ui-panel');
+            const openBtn = document.getElementById('panel-open-btn');
+            if (visible) {
+                panel.style.display = 'block';
+                setTimeout(() => { panel.style.opacity = 0.95; }, 10);
+                openBtn.style.display = 'none';
+            } else {
+                panel.style.opacity = 0;
+                setTimeout(() => { panel.style.display = 'none'; }, 300);
+                openBtn.style.display = 'flex';
+            }
+        }
+    </script>
+</body>
+</html>

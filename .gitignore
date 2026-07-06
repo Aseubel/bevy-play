@@ -1,0 +1,17 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# Generated Web Arcade binaries
+/web/bevy-play.js
+/web/bevy-play_bg.wasm
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# IDEs/Editors
+.vscode/
+.idea/
+*.rs.bk
+.helix/
