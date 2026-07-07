@@ -1,14 +1,14 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
-mod snake;
+mod minesweeper;
 mod voxel;
 
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
 pub enum GameMode {
     #[default]
     Voxel,
-    Snake,
+    Minesweeper,
 }
 
 fn get_starting_mode() -> GameMode {
@@ -17,8 +17,8 @@ fn get_starting_mode() -> GameMode {
         if let Some(window) = web_sys::window() {
             let location = window.location();
             if let Ok(search) = location.search() {
-                if search.contains("game=snake") {
-                    return GameMode::Snake;
+                if search.contains("game=minesweeper") {
+                    return GameMode::Minesweeper;
                 }
             }
         }
@@ -31,6 +31,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Bevy Web Arcade".into(),
+                canvas: Some("#bevy-canvas".into()),
                 ..default()
             }),
             ..default()
@@ -63,16 +64,13 @@ fn main() {
                 .run_if(in_state(GameMode::Voxel)),
         )
         // Modular Plugins
-        .add_plugins(snake::SnakePlugin)
+        .add_plugins(minesweeper::MinesweeperPlugin)
         .run();
 }
 
 // Tag components to clean up entities on game mode switch
 #[derive(Component)]
 pub struct VoxelEntity;
-
-#[derive(Component)]
-pub struct SnakeEntity;
 
 // Shared cleanup helper to clear state entities on transition
 fn cleanup_state<T: Component>(mut commands: Commands, query: Query<Entity, With<T>>) {

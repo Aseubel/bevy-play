@@ -141,7 +141,7 @@
             --glow-color-rgb: var(--primary-glow-rgb);
         }
 
-        .snake-card {
+        .minesweeper-card {
             --glow-color-rgb: var(--secondary-glow-rgb);
         }
 
@@ -484,14 +484,14 @@
                 <a class="btn-launch" href="?game=voxel">Launch Game</a>
             </article>
 
-            <!-- Game Card 2: 3D Retro Snake -->
-            <article class="game-card snake-card">
+            <!-- Game Card 2: 2D Minesweeper -->
+            <article class="game-card minesweeper-card">
                 <div>
-                    <div class="card-icon">🐍</div>
-                    <h2 class="card-title">3D Retro Snake</h2>
-                    <p class="card-desc">The classic Snake game transformed into a 3D grid layout. Guide the snake, consume glowing energy cores, and beat your high score.</p>
+                    <div class="card-icon">💣</div>
+                    <h2 class="card-title">2D Minesweeper</h2>
+                    <p class="card-desc">The classic Minesweeper puzzle. Reveal safe squares, flag hidden mines, and clear the 10x10 board without exploding.</p>
                 </div>
-                <a class="btn-launch" href="?game=snake">Launch Game</a>
+                <a class="btn-launch" href="?game=minesweeper">Launch Game</a>
             </article>
         </main>
     </div>
@@ -533,6 +533,7 @@
     <!-- 6. Game Canvas Container -->
     <main id="game-container">
         <!-- Bevy Canvas will be inserted here -->
+        <canvas id="bevy-canvas"></canvas>
     </main>
 
     <!-- WASM loading and initialization script -->
@@ -543,7 +544,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const gameParam = urlParams.get('game');
 
-        if (gameParam === 'voxel' || gameParam === 'snake') {
+        if (gameParam === 'voxel' || gameParam === 'minesweeper') {
             // Hide the arcade portal and show game elements
             document.getElementById('arcade-portal').style.display = 'none';
             document.getElementById('game-container').style.display = 'flex';
@@ -581,31 +582,22 @@
                         <li class="control-item"><span class="control-desc">Wood / Leaves</span><span class="control-key">4 / 5</span></li>
                     </ul>
                 `;
-            } else if (gameParam === 'snake') {
-                loaderTitle.innerText = "3D Retro Snake";
-                panelTitle.innerHTML = '3D Retro & Platformer Snake <span class="badge">Bevy 0.19</span>';
-                panelSubtitle.innerText = 'Retro arcade Snake in a 3D dual-layer arena. Navigate vertical floors and manage updrafts!';
+            } else if (gameParam === 'minesweeper') {
+                loaderTitle.innerText = "2D Minesweeper";
+                panelTitle.innerHTML = '2D Minesweeper <span class="badge">Bevy 0.19</span>';
+                panelSubtitle.innerText = 'Classic Minesweeper logic implemented in Bevy 2D sprites. Clear the board!';
                 playBtn.innerText = "Start Game";
 
                 controlsContainer.innerHTML = `
-                    <div class="section-title">Keyboard Controls</div>
+                    <div class="section-title">Controls</div>
                     <ul class="control-list">
-                        <li class="control-item"><span class="control-desc">Movement</span><span class="control-key">W A S D / Arrow Keys</span></li>
-                        <li class="control-item"><span class="control-desc">Pause & Orbit View</span><span class="control-key">Spacebar</span></li>
-                        <li class="control-item"><span class="control-desc">Restart on Death</span><span class="control-key">R</span></li>
+                        <li class="control-item"><span class="control-desc">Reveal Square</span><span class="control-key">Left Click</span></li>
+                        <li class="control-item"><span class="control-desc">Toggle Flag</span><span class="control-key">Right Click</span></li>
+                        <li class="control-item"><span class="control-desc">Restart Game</span><span class="control-key">R Key</span></li>
                     </ul>
-                    <div class="section-title">Pause Mode Camera</div>
-                    <ul class="control-list">
-                        <li class="control-item"><span class="control-desc">Rotate camera view</span><span class="control-key">Move Mouse</span></li>
-                    </ul>
-                    <div class="section-title">Camera Settings</div>
-                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); cursor: pointer; margin-bottom: 20px;">
-                        <input type="checkbox" id="camera-reset-checkbox" checked style="accent-color: var(--primary-glow); cursor: pointer;">
-                        Auto-reset Camera view on resume
-                    </label>
-                    <div class="section-title">3D Layer Mechanics</div>
+                    <div class="section-title">Rules</div>
                     <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
-                        The arena features an <strong>Upper Glass Floor</strong> and a <strong>Lower Metal Floor</strong>. The upper floor has open sides (East/West)—falling off drops you safely to the lower floor. Stepping on green <strong>Glowing Updraft Vents</strong> on the lower floor launches the snake back to the upper floor!
+                        The grid contains 15 hidden mines. Reveal all safe cells to win. If you click on a mine, you lose! Numbers indicate how many mines are adjacent to that square.
                     </p>
                 `;
             }
