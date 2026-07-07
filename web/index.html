@@ -59,8 +59,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 24px;
+            justify-content: flex-start;
+            padding: 60px 24px;
             z-index: 20;
             overflow-y: auto;
             background: radial-gradient(circle at center, rgba(13, 17, 28, 0.9) 0%, #080a0f 100%);
@@ -92,11 +92,11 @@
 
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(2, 340px);
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 32px;
             justify-content: center;
             width: 100%;
-            max-width: 800px;
+            max-width: 1000px;
         }
 
         .game-card {
@@ -143,6 +143,18 @@
 
         .minesweeper-card {
             --glow-color-rgb: var(--secondary-glow-rgb);
+        }
+
+        .bunnymark-card {
+            --glow-color-rgb: 234, 179, 8;
+        }
+
+        .lifegame-card {
+            --glow-color-rgb: 6, 182, 212; /* Vibrant cyan */
+        }
+
+        .terrain-card {
+            --glow-color-rgb: 249, 115, 22; /* Sunset orange */
         }
 
         .card-icon {
@@ -493,6 +505,36 @@
                 </div>
                 <a class="btn-launch" href="?game=minesweeper">Launch Game</a>
             </article>
+
+            <!-- Game Card 3: ECS Bunnymark -->
+            <article class="game-card bunnymark-card">
+                <div>
+                    <div class="card-icon">🐇</div>
+                    <h2 class="card-title">ECS Bunnymark</h2>
+                    <p class="card-desc">Benchmark Bevy's ECS multi-core parallel rendering. Click to spawn thousands of bunnies in real-time.</p>
+                </div>
+                <a class="btn-launch" href="?game=bunnymark">Launch Game</a>
+            </article>
+
+            <!-- Game Card 4: 3D Game of Life -->
+            <article class="game-card lifegame-card">
+                <div>
+                    <div class="card-icon">🧬</div>
+                    <h2 class="card-title">3D Game of Life</h2>
+                    <p class="card-desc">Experience 3D Conway's cellular automata. Observe a 16x16x16 grid evolve dynamically with smooth orbital camera controls.</p>
+                </div>
+                <a class="btn-launch" href="?game=lifegame">Launch Game</a>
+            </article>
+
+            <!-- Game Card 5: Procedural Terrain -->
+            <article class="game-card terrain-card">
+                <div>
+                    <div class="card-icon">⛰️</div>
+                    <h2 class="card-title">Low-Poly Terrain</h2>
+                    <p class="card-desc">Procedurally generate a gorgeous 3D low-poly landscape. Press R or click refresh to rebuild the terrain with a new seed.</p>
+                </div>
+                <a class="btn-launch" href="?game=terrain">Launch Game</a>
+            </article>
         </main>
     </div>
 
@@ -539,12 +581,12 @@
     <!-- WASM loading and initialization script -->
     <script type="module">
         import init from './bevy-play.js';
-
+ 
         // Check which game was requested
         const urlParams = new URLSearchParams(window.location.search);
         const gameParam = urlParams.get('game');
 
-        if (gameParam === 'voxel' || gameParam === 'minesweeper') {
+        if (gameParam === 'voxel' || gameParam === 'minesweeper' || gameParam === 'bunnymark' || gameParam === 'lifegame' || gameParam === 'terrain') {
             // Hide the arcade portal and show game elements
             document.getElementById('arcade-portal').style.display = 'none';
             document.getElementById('game-container').style.display = 'flex';
@@ -598,6 +640,56 @@
                     <div class="section-title">Rules</div>
                     <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
                         The grid contains 15 hidden mines. Reveal all safe cells to win. If you click on a mine, you lose! Numbers indicate how many mines are adjacent to that square.
+                    </p>
+                `;
+            } else if (gameParam === 'bunnymark') {
+                loaderTitle.innerText = "ECS Bunnymark";
+                panelTitle.innerHTML = 'ECS Bunnymark <span class="badge">Bevy 0.19</span>';
+                panelSubtitle.innerText = 'ECS multi-core parallel rendering benchmark test. Spawn thousands of entities to stress-test.';
+                playBtn.innerText = "Run Benchmark";
+
+                controlsContainer.innerHTML = `
+                    <div class="section-title">Controls</div>
+                    <ul class="control-list">
+                        <li class="control-item"><span class="control-desc">Spawn 1000 Bunnies</span><span class="control-key">Left Click</span></li>
+                    </ul>
+                    <div class="section-title">Description</div>
+                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                        This mode measures the performance of Bevy's ECS scheduling and 2D batch renderer. Move your mouse and click to spawn additional batches of 1,000 bunnies.
+                    </p>
+                `;
+            } else if (gameParam === 'lifegame') {
+                loaderTitle.innerText = "3D Game of Life";
+                panelTitle.innerHTML = '3D Game of Life <span class="badge">Bevy 0.19</span>';
+                panelSubtitle.innerText = '3D cellular automata Conway rules in a 16x16x16 grid.';
+                playBtn.innerText = "Run Simulation";
+
+                controlsContainer.innerHTML = `
+                    <div class="section-title">Rules (3D)</div>
+                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
+                        • <strong>Survival:</strong> A living cell with 4 or 5 living neighbors survives.<br>
+                        • <strong>Death:</strong> Otherwise, it dies of isolation or overcrowding.<br>
+                        • <strong>Birth:</strong> A dead cell position with exactly 5 living neighbors becomes alive.
+                    </p>
+                    <div class="section-title">Visuals</div>
+                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                        All 4,096 cell cubes are pre-allocated and their visibility is toggled dynamically. The camera slowly orbits the scene to view the 3D structure.
+                    </p>
+                `;
+            } else if (gameParam === 'terrain') {
+                loaderTitle.innerText = "Procedural Terrain";
+                panelTitle.innerHTML = 'Procedural Terrain <span class="badge">Bevy 0.19</span>';
+                panelSubtitle.innerText = 'A procedurally generated Low-Poly 3D landscape rendered dynamically inside the browser.';
+                playBtn.innerText = "Explore Terrain";
+
+                controlsContainer.innerHTML = `
+                    <div class="section-title">Controls</div>
+                    <ul class="control-list">
+                        <li class="control-item"><span class="control-desc">Refresh Terrain</span><span class="control-key">R Key</span></li>
+                    </ul>
+                    <div class="section-title">Generation Info</div>
+                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                        This mode constructs a 64x64 flat-shaded triangle mesh. By generating separate vertices for each polygon rather than sharing vertices, we obtain crisp flat lighting. Height values are generated using multiple octaves of sine and cosine functions.
                     </p>
                 `;
             }

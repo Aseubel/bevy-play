@@ -3,12 +3,18 @@ use std::collections::HashMap;
 
 mod minesweeper;
 mod voxel;
+mod bunnymark;
+mod life_game;
+mod terrain;
 
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
 pub enum GameMode {
     #[default]
     Voxel,
     Minesweeper,
+    Bunnymark,
+    LifeGame,
+    Terrain,
 }
 
 fn get_starting_mode() -> GameMode {
@@ -19,6 +25,12 @@ fn get_starting_mode() -> GameMode {
             if let Ok(search) = location.search() {
                 if search.contains("game=minesweeper") {
                     return GameMode::Minesweeper;
+                } else if search.contains("game=bunnymark") {
+                    return GameMode::Bunnymark;
+                } else if search.contains("game=lifegame") {
+                    return GameMode::LifeGame;
+                } else if search.contains("game=terrain") {
+                    return GameMode::Terrain;
                 }
             }
         }
@@ -65,6 +77,9 @@ fn main() {
         )
         // Modular Plugins
         .add_plugins(minesweeper::MinesweeperPlugin)
+        .add_plugins(bunnymark::BunnymarkPlugin)
+        .add_plugins(life_game::LifeGamePlugin)
+        .add_plugins(terrain::TerrainPlugin)
         .run();
 }
 

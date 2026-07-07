@@ -30,6 +30,14 @@ echo "========================================="
 # features (like reference types or tail calls) that crash browsers.
 wasm-opt -Oz --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int web/bevy-play_bg.wasm -o web/bevy-play_bg.wasm
 
+if [ -d "assets" ]; then
+    echo "========================================="
+    echo "  4. Syncing assets directory..."
+    echo "========================================="
+    rm -rf web/assets
+    cp -r assets web/assets
+fi
+
 echo "========================================="
 echo "  Build successful!"
 echo "========================================="

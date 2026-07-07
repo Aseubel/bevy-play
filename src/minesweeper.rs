@@ -31,6 +31,12 @@ pub struct MinesweeperBoard {
     pub grid: Vec<Vec<Cell>>,
     pub state: GameStatus,
     pub flags_placed: usize,
+    pub is_generated: bool,
+}
+
+#[derive(Resource)]
+pub struct MinesweeperAssets {
+    pub bomb: Handle<Image>,
 }
 
 #[derive(Component)]
@@ -61,41 +67,194 @@ fn get_random_value() -> f64 {
     }
 }
 
-pub fn setup_minesweeper(
-    mut commands: Commands,
-    mut board: ResMut<MinesweeperBoard>,
-) {
-    // Spawn 2D Camera
-    commands.spawn((
-        Camera2d::default(),
-        MinesweeperEntity,
-    ));
+fn is_solvable(
+    width: usize,
+    height: usize,
+    start_x: usize,
+    start_y: usize,
+    grid_setup: &Vec<Vec<CellType>>,
+) -> bool {
+    #[derive(Clone, Copy, PartialEq)]
+    enum VirtualState {
+        Hidden,
+        Flagged,
+        Revealed(u8),
+    }
 
-    let width = 10;
-    let height = 10;
-    let mine_count = 15;
+    let mut v_grid = vec![vec![VirtualState::Hidden; height]; width];
 
-    let mut grid = vec![vec![Cell {
-        cell_type: CellType::Empty,
-        neighbor_mines: 0,
-        is_revealed: false,
-        is_flagged: false,
-        entity: None,
-    }; height]; width];
+    let get_neighbors = |x: usize, y: usize| -> Vec<(usize, usize)> {
+        let mut res = Vec::new();
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+                let nx = x as i32 + dx;
+                let ny = y as i32 + dy;
+                if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
+                    res.push((nx as usize, ny as usize));
+                }
+            }
+        }
+        res
+    };
 
-    let mut mines_placed = 0;
-    while mines_placed < mine_count {
-        let x = (get_random_value() * width as f64) as usize;
-        let y = (get_random_value() * height as f64) as usize;
-        if grid[x][y].cell_type == CellType::Empty {
-            grid[x][y].cell_type = CellType::Mine;
-            mines_placed += 1;
+    let calc_neighbor_mines = |x: usize, y: usize, grid: &Vec<Vec<CellType>>| -> u8 {
+        let mut count = 0;
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+                let nx = x as i32 + dx;
+                let ny = y as i32 + dy;
+                if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
+                    if grid[nx as usize][ny as usize] == CellType::Mine {
+                        count += 1;
+                    }
+                }
+            }
+        }
+        count
+    };
+
+    let start_mines = calc_neighbor_mines(start_x, start_y, grid_setup);
+    v_grid[start_x][start_y] = VirtualState::Revealed(start_mines);
+
+    let mut reveal_queue = vec![(start_x, start_y)];
+    while let Some((cx, cy)) = reveal_queue.pop() {
+        let count = calc_neighbor_mines(cx, cy, grid_setup);
+        v_grid[cx][cy] = VirtualState::Revealed(count);
+        if count == 0 {
+            for (nx, ny) in get_neighbors(cx, cy) {
+                if v_grid[nx][ny] == VirtualState::Hidden && grid_setup[nx][ny] == CellType::Empty {
+                    v_grid[nx][ny] = VirtualState::Revealed(calc_neighbor_mines(nx, ny, grid_setup));
+                    reveal_queue.push((nx, ny));
+                }
+            }
+        }
+    }
+
+    let mut progress = true;
+    while progress {
+        progress = false;
+
+        for x in 0..width {
+            for y in 0..height {
+                if let VirtualState::Revealed(num) = v_grid[x][y] {
+                    if num == 0 {
+                        continue;
+                    }
+
+                    let neighbors = get_neighbors(x, y);
+                    let mut hidden = Vec::new();
+                    let mut flagged_count = 0;
+
+                    for &(nx, ny) in &neighbors {
+                        match v_grid[nx][ny] {
+                            VirtualState::Hidden => hidden.push((nx, ny)),
+                            VirtualState::Flagged => flagged_count += 1,
+                            _ => {}
+                        }
+                    }
+
+                    if hidden.is_empty() {
+                        continue;
+                    }
+
+                    let remaining_mines = num as i32 - flagged_count;
+                    if remaining_mines == hidden.len() as i32 {
+                        for &(hx, hy) in &hidden {
+                            v_grid[hx][hy] = VirtualState::Flagged;
+                        }
+                        progress = true;
+                    }
+                    else if remaining_mines == 0 {
+                        let mut local_reveal = Vec::new();
+                        for &(hx, hy) in &hidden {
+                            v_grid[hx][hy] = VirtualState::Revealed(calc_neighbor_mines(hx, hy, grid_setup));
+                            local_reveal.push((hx, hy));
+                        }
+
+                        while let Some((cx, cy)) = local_reveal.pop() {
+                            if let VirtualState::Revealed(0) = v_grid[cx][cy] {
+                                for (nx, ny) in get_neighbors(cx, cy) {
+                                    if v_grid[nx][ny] == VirtualState::Hidden {
+                                        v_grid[nx][ny] = VirtualState::Revealed(calc_neighbor_mines(nx, ny, grid_setup));
+                                        local_reveal.push((nx, ny));
+                                    }
+                                }
+                            }
+                        }
+
+                        progress = true;
+                    }
+                }
+            }
         }
     }
 
     for x in 0..width {
         for y in 0..height {
-            if grid[x][y].cell_type == CellType::Mine {
+            if grid_setup[x][y] == CellType::Empty {
+                if let VirtualState::Revealed(_) = v_grid[x][y] {
+                    // Ok
+                } else {
+                    return false;
+                }
+            }
+        }
+    }
+
+    true
+}
+
+fn generate_mines_and_solve(
+    click_x: usize,
+    click_y: usize,
+    board: &mut MinesweeperBoard,
+) {
+    let width = board.width;
+    let height = board.height;
+    let mine_count = board.mine_count;
+
+    let mut retries = 0;
+    let max_retries = 1000;
+
+    loop {
+        let mut temp_grid = vec![vec![CellType::Empty; height]; width];
+
+        let mut mines_placed = 0;
+        while mines_placed < mine_count {
+            let x = (get_random_value() * width as f64) as usize;
+            let y = (get_random_value() * height as f64) as usize;
+
+            let is_in_safe_zone = (x as i32 - click_x as i32).abs() <= 1 
+                               && (y as i32 - click_y as i32).abs() <= 1;
+
+            if !is_in_safe_zone && temp_grid[x][y] == CellType::Empty {
+                temp_grid[x][y] = CellType::Mine;
+                mines_placed += 1;
+            }
+        }
+
+        retries += 1;
+        if is_solvable(width, height, click_x, click_y, &temp_grid) || retries >= max_retries {
+            for x in 0..width {
+                for y in 0..height {
+                    board.grid[x][y].cell_type = temp_grid[x][y];
+                }
+            }
+            break;
+        }
+    }
+
+    let width = board.width;
+    let height = board.height;
+    for x in 0..width {
+        for y in 0..height {
+            if board.grid[x][y].cell_type == CellType::Mine {
                 continue;
             }
             let mut count = 0;
@@ -107,15 +266,46 @@ pub fn setup_minesweeper(
                     let nx = x as i32 + dx;
                     let ny = y as i32 + dy;
                     if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                        if grid[nx as usize][ny as usize].cell_type == CellType::Mine {
+                        if board.grid[nx as usize][ny as usize].cell_type == CellType::Mine {
                             count += 1;
                         }
                     }
                 }
             }
-            grid[x][y].neighbor_mines = count;
+            board.grid[x][y].neighbor_mines = count;
         }
     }
+
+    board.is_generated = true;
+}
+
+pub fn setup_minesweeper(
+    mut commands: Commands,
+    mut board: ResMut<MinesweeperBoard>,
+    asset_server: Res<AssetServer>,
+) {
+    let bomb_handle = asset_server.load("bomb.png");
+    commands.insert_resource(MinesweeperAssets {
+        bomb: bomb_handle,
+    });
+
+    // Spawn 2D Camera
+    commands.spawn((
+        Camera2d::default(),
+        MinesweeperEntity,
+    ));
+
+    let width = 10;
+    let height = 10;
+    let mine_count = 15;
+
+    let grid = vec![vec![Cell {
+        cell_type: CellType::Empty,
+        neighbor_mines: 0,
+        is_revealed: false,
+        is_flagged: false,
+        entity: None,
+    }; height]; width];
 
     board.width = width;
     board.height = height;
@@ -123,6 +313,7 @@ pub fn setup_minesweeper(
     board.grid = grid;
     board.state = GameStatus::Playing;
     board.flags_placed = 0;
+    board.is_generated = false;
 
     let cell_size = 40.0;
     let gap = 4.0;
@@ -232,6 +423,7 @@ fn toggle_flag(
 fn reveal_all_mines(
     board: &MinesweeperBoard,
     query: &mut Query<(&mut Sprite, &MinesweeperCell)>,
+    bomb_handle: &Handle<Image>,
 ) {
     for x in 0..board.width {
         for y in 0..board.height {
@@ -239,7 +431,8 @@ fn reveal_all_mines(
             if cell.cell_type == CellType::Mine {
                 if let Some(entity) = cell.entity {
                     if let Ok((mut sprite, _)) = query.get_mut(entity) {
-                        sprite.color = Color::srgb(1.0, 0.15, 0.15); // Red for mines
+                        sprite.image = bomb_handle.clone();
+                        sprite.color = Color::srgb(1.0, 1.0, 1.0); // Reset color to White so the bomb image shows in original colors!
                     }
                 }
             }
@@ -253,6 +446,7 @@ fn reveal_cell(
     board: &mut MinesweeperBoard,
     commands: &mut Commands,
     query: &mut Query<(&mut Sprite, &MinesweeperCell)>,
+    assets: &MinesweeperAssets,
 ) {
     if board.grid[x][y].is_revealed || board.grid[x][y].is_flagged {
         return;
@@ -262,7 +456,7 @@ fn reveal_cell(
 
     if board.grid[x][y].cell_type == CellType::Mine {
         board.state = GameStatus::Lost;
-        reveal_all_mines(board, query);
+        reveal_all_mines(board, query, &assets.bomb);
         return;
     }
 
@@ -352,6 +546,7 @@ pub fn minesweeper_click_system(
     mut commands: Commands,
     mut query: Query<(&mut Sprite, &MinesweeperCell)>,
     mut text_query: Query<&mut Text2d, With<MinesweeperText>>,
+    assets: Res<MinesweeperAssets>,
 ) {
     if board.state != GameStatus::Playing {
         return;
@@ -384,7 +579,10 @@ pub fn minesweeper_click_system(
                 let gy = grid_y as usize;
 
                 if left_clicked {
-                    reveal_cell(gx, gy, &mut board, &mut commands, &mut query);
+                    if !board.is_generated {
+                        generate_mines_and_solve(gx, gy, &mut board);
+                    }
+                    reveal_cell(gx, gy, &mut board, &mut commands, &mut query, &assets);
                 } else if right_clicked {
                     toggle_flag(gx, gy, &mut board, &mut query);
                 }
@@ -408,8 +606,7 @@ pub fn minesweeper_input_system(
 
         let width = 10;
         let height = 10;
-        let mine_count = 15;
-        let mut grid = vec![vec![Cell {
+        let grid = vec![vec![Cell {
             cell_type: CellType::Empty,
             neighbor_mines: 0,
             is_revealed: false,
@@ -417,43 +614,10 @@ pub fn minesweeper_input_system(
             entity: None,
         }; height]; width];
 
-        let mut mines_placed = 0;
-        while mines_placed < mine_count {
-            let x = (get_random_value() * width as f64) as usize;
-            let y = (get_random_value() * height as f64) as usize;
-            if grid[x][y].cell_type == CellType::Empty {
-                grid[x][y].cell_type = CellType::Mine;
-                mines_placed += 1;
-            }
-        }
-
-        for x in 0..width {
-            for y in 0..height {
-                if grid[x][y].cell_type == CellType::Mine {
-                    continue;
-                }
-                let mut count = 0;
-                for dx in -1..=1 {
-                    for dy in -1..=1 {
-                        if dx == 0 && dy == 0 {
-                            continue;
-                        }
-                        let nx = x as i32 + dx;
-                        let ny = y as i32 + dy;
-                        if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                            if grid[nx as usize][ny as usize].cell_type == CellType::Mine {
-                                count += 1;
-                            }
-                        }
-                    }
-                }
-                grid[x][y].neighbor_mines = count;
-            }
-        }
-
         board.grid = grid;
         board.state = GameStatus::Playing;
         board.flags_placed = 0;
+        board.is_generated = false;
 
         commands.spawn((
             Camera2d::default(),
@@ -505,6 +669,7 @@ pub fn cleanup_minesweeper(
     for entity in &query {
         commands.entity(entity).despawn();
     }
+    commands.remove_resource::<MinesweeperAssets>();
 }
 
 pub struct MinesweeperPlugin;
@@ -518,6 +683,7 @@ impl Plugin for MinesweeperPlugin {
             grid: Vec::new(),
             state: GameStatus::Playing,
             flags_placed: 0,
+            is_generated: false,
         })
         .add_systems(
             OnEnter(crate::GameMode::Minesweeper),
