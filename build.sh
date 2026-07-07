@@ -2,8 +2,15 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
+# add target wasm32-unknown-unknown
+if ! rustup target list | grep -q "wasm32-unknown-unknown"; then
+    rustup target add wasm32-unknown-unknown
+fi
+
 # delete old file
-rm -f web/bevy-play_bg.wasm
+if [ -f "web/bevy-play_bg.wasm" ]; then
+    rm -f web/bevy-play_bg.wasm
+fi
 
 echo "========================================="
 echo "  1. Compiling Bevy project to WASM..."

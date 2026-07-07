@@ -45,7 +45,6 @@ fn main() {
         })
         // Shared Exit Cleanup systems
         .add_systems(OnExit(GameMode::Voxel), cleanup_state::<VoxelEntity>)
-        .add_systems(OnExit(GameMode::Snake), cleanup_state::<SnakeEntity>)
         // Voxel Game Mode systems
         .add_systems(
             OnEnter(GameMode::Voxel),
@@ -63,22 +62,8 @@ fn main() {
             )
                 .run_if(in_state(GameMode::Voxel)),
         )
-        // Snake Game Mode systems
-        .add_systems(
-            OnEnter(GameMode::Snake),
-            (snake::setup_snake, snake::spawn_snake_hud),
-        )
-        .add_systems(
-            Update,
-            (
-                snake::snake_input_system,
-                snake::snake_tick_system,
-                snake::snake_camera_system,
-                snake::snake_render_update_system,
-                snake::snake_restart_system,
-            )
-                .run_if(in_state(GameMode::Snake)),
-        )
+        // Modular Plugins
+        .add_plugins(snake::SnakePlugin)
         .run();
 }
 
