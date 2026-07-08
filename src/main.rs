@@ -6,6 +6,7 @@ mod voxel;
 mod bunnymark;
 mod life_game;
 mod terrain;
+mod aim_trainer;
 
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
 pub enum GameMode {
@@ -15,6 +16,7 @@ pub enum GameMode {
     Bunnymark,
     LifeGame,
     Terrain,
+    AimTrainer,
 }
 
 fn get_starting_mode() -> GameMode {
@@ -31,6 +33,8 @@ fn get_starting_mode() -> GameMode {
                     return GameMode::LifeGame;
                 } else if search.contains("game=terrain") {
                     return GameMode::Terrain;
+                } else if search.contains("game=aimtrainer") {
+                    return GameMode::AimTrainer;
                 }
             }
         }
@@ -80,6 +84,7 @@ fn main() {
         .add_plugins(bunnymark::BunnymarkPlugin)
         .add_plugins(life_game::LifeGamePlugin)
         .add_plugins(terrain::TerrainPlugin)
+        .add_plugins(aim_trainer::AimTrainerPlugin)
         .run();
 }
 

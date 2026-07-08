@@ -157,6 +157,10 @@
             --glow-color-rgb: 249, 115, 22; /* Sunset orange */
         }
 
+        .aimtrainer-card {
+            --glow-color-rgb: 239, 68, 68; /* Vibrant target red */
+        }
+
         .card-icon {
             font-size: 40px;
             margin-bottom: 20px;
@@ -535,6 +539,16 @@
                 </div>
                 <a class="btn-launch" href="?game=terrain">Launch Game</a>
             </article>
+
+            <!-- Game Card 6: 3D Aim Trainer -->
+            <article class="game-card aimtrainer-card">
+                <div>
+                    <div class="card-icon">🎯</div>
+                    <h2 class="card-title">3D Aim Trainer</h2>
+                    <p class="card-desc">Practice your FPS reflexes in a 3D target shooting range. Test your reaction time and aim precision under a 60-second limit.</p>
+                </div>
+                <a class="btn-launch" href="?game=aimtrainer">Launch Game</a>
+            </article>
         </main>
     </div>
 
@@ -586,7 +600,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const gameParam = urlParams.get('game');
 
-        if (gameParam === 'voxel' || gameParam === 'minesweeper' || gameParam === 'bunnymark' || gameParam === 'lifegame' || gameParam === 'terrain') {
+        if (gameParam === 'voxel' || gameParam === 'minesweeper' || gameParam === 'bunnymark' || gameParam === 'lifegame' || gameParam === 'terrain' || gameParam === 'aimtrainer') {
             // Hide the arcade portal and show game elements
             document.getElementById('arcade-portal').style.display = 'none';
             document.getElementById('game-container').style.display = 'flex';
@@ -690,6 +704,25 @@
                     <div class="section-title">Generation Info</div>
                     <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
                         This mode constructs a 64x64 flat-shaded triangle mesh. By generating separate vertices for each polygon rather than sharing vertices, we obtain crisp flat lighting. Height values are generated using multiple octaves of sine and cosine functions.
+                    </p>
+                `;
+            } else if (gameParam === 'aimtrainer') {
+                loaderTitle.innerText = "3D Aim Trainer";
+                panelTitle.innerHTML = '3D Aim Trainer <span class="badge">Bevy 0.19</span>';
+                panelSubtitle.innerText = 'Classic first-person 3D target shooting sandbox to train precision and speed.';
+                playBtn.innerText = "Start Training";
+
+                controlsContainer.innerHTML = `
+                    <div class="section-title">Controls</div>
+                    <ul class="control-list">
+                        <li class="control-item"><span class="control-desc">Aim / Rotate View</span><span class="control-key">Move Mouse</span></li>
+                        <li class="control-item"><span class="control-desc">Lock View / Shoot</span><span class="control-key">Left Click</span></li>
+                        <li class="control-item"><span class="control-desc">Release Mouse</span><span class="control-key">Escape Key</span></li>
+                        <li class="control-item"><span class="control-desc">Restart Target Run</span><span class="control-key">R Key</span></li>
+                    </ul>
+                    <div class="section-title">Trainer Rules</div>
+                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                        Aim at the bright red targets and left click to destroy them. The target wall will keep spawning up to 3 active targets. Complete as many targets as you can in the 60-second limit. Press R on the Game Over screen to restart.
                     </p>
                 `;
             }
